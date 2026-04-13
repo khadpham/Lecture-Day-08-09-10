@@ -17,7 +17,3 @@ __pycache__/
 .omx/
 .venv/
 src_w_solution/
-
-# ChromaDB files
-chroma.sqlite3
-chroma_db/
