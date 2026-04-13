@@ -20,4 +20,4 @@ src_w_solution/
 
 # ChromaDB files
 chroma.sqlite3
-day08/lab/chroma_db/
+chroma_db/
