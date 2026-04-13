@@ -79,10 +79,42 @@ def retrieve_dense(query: str, top_k: int = TOP_K_SEARCH) -> List[Dict[str, Any]
         # Lưu ý: distances trong ChromaDB cosine = 1 - similarity
         # Score = 1 - distance
     """
-    raise NotImplementedError(
-        "TODO Sprint 2: Implement retrieve_dense().\n"
-        "Tham khảo comment trong hàm để biết cách query ChromaDB."
+    if not query or not query.strip():
+        return []
+
+    import chromadb
+    from index import CHROMA_DB_DIR, get_embedding
+
+    client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
+    collection = client.get_collection("rag_lab")
+
+    query_embedding = get_embedding(query)
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=max(1, top_k),
+        include=["documents", "metadatas", "distances"],
     )
+
+    documents = (results.get("documents") or [[]])[0]
+    metadatas = (results.get("metadatas") or [[]])[0]
+    distances = (results.get("distances") or [[]])[0]
+
+    dense_results: List[Dict[str, Any]] = []
+    for doc, meta, distance in zip(documents, metadatas, distances):
+        text = (doc or "").strip()
+        if not text:
+            continue
+
+        # Với metric cosine của ChromaDB: similarity = 1 - distance
+        score = 1.0 - float(distance if distance is not None else 1.0)
+        dense_results.append({
+            "text": text,
+            "metadata": meta or {},
+            "score": score,
+        })
+
+    dense_results.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+    return dense_results
 
 
 # =============================================================================
@@ -277,9 +309,10 @@ def build_grounded_prompt(query: str, context_block: str) -> str:
     - Thêm ngôn ngữ phản hồi (tiếng Việt vs tiếng Anh)
     - Điều chỉnh tone phù hợp với use case (CS helpdesk, IT support)
     """
-    prompt = f"""Answer only from the retrieved context below.
-If the context is insufficient to answer the question, say you do not know and do not make up information.
-Cite the source field (in brackets like [1]) when possible.
+    prompt = f"""Answer ONLY from the retrieved context below.
+If the context is insufficient to answer the question, reply exactly: "Không đủ dữ liệu".
+Do not make up information.
+If you provide an answer from context, you MUST include at least one citation marker like [1] or [2].
 Keep your answer short, clear, and factual.
 Respond in the same language as the question.
 
@@ -432,6 +465,16 @@ def rag_answer(
     if verbose:
         print(f"[RAG] After select: {len(candidates)} chunks")
 
+    # Không retrieve được evidence -> abstain sớm
+    if not candidates:
+        return {
+            "query": query,
+            "answer": "Không đủ dữ liệu trong tài liệu hiện có.",
+            "sources": [],
+            "chunks_used": [],
+            "config": config,
+        }
+
     # --- Bước 3: Build context và prompt ---
     context_block = build_context_block(candidates)
     prompt = build_grounded_prompt(query, context_block)
@@ -440,7 +483,21 @@ def rag_answer(
         print(f"\n[RAG] Prompt:\n{prompt[:500]}...\n")
 
     # --- Bước 4: Generate ---
-    answer = call_llm(prompt)
+    answer = (call_llm(prompt) or "").strip()
+
+    lowered = answer.lower()
+    abstain_markers = [
+        "không đủ dữ liệu",
+        "không tìm thấy thông tin",
+        "không thể tìm thấy thông tin",
+        "i do not know",
+        "do not know",
+    ]
+    if any(marker in lowered for marker in abstain_markers):
+        answer = "Không đủ dữ liệu"
+    elif "[" not in answer and candidates:
+        # Guardrail Sprint 2: nếu model quên citation, bổ sung citation đầu tiên.
+        answer = f"{answer} [1]"
 
     # --- Bước 5: Extract sources ---
     sources = list({
