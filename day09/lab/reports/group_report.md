@@ -1,7 +1,12 @@
 # Báo Cáo Nhóm — Lab Day 09: Multi-Agent Orchestration
 
-**Tên nhóm:** 2A202600292-TranDangQuangHuy  
-**Thành viên:** *(ẩn thông tin theo yêu cầu; nhóm 5 người)*  
+**Tên nhóm:** E403 - nhóm 72  
+**Thành viên:** 
+* 2A202600292 - Trần Đặng Quang Huy - huytdqhe180383
+* 2A202600253 - Phạm Đan Kha - khadpham
+* 2A202600153- Nguyễn Duy Hiếu- SharkUndead
+* 2A202600276 - Phan Anh Khôi - anhkhoiphan03
+* 2A202600338 - Vũ Đức Kiên - helloisKien
 **Ngày nộp:** 2026-04-14  
 **Repo:** `Lecture-Day-08-09-10/day09/lab`
 
