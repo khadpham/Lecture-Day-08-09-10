@@ -1,6 +1,6 @@
 # Báo Cáo Cá Nhân — Lab Day 09: Multi-Agent Orchestration
 
-**Họ và tên:** member_1  
+**Họ và tên:** Nguyễn Duy Hiếu  
 **Vai trò trong nhóm:** Retrieval Owner  
 **Ngày nộp:** 2026-04-14
 
