@@ -197,4 +197,29 @@ Xem chi tiết trong `docs/commit_plan.md`. Tóm tắt ngắn:
 
 ---
 
+## 9. Debug: Cách khoanh vùng lỗi nhanh
+
+Khi câu trả lời chưa đúng, nhóm thường kiểm tra theo 4 bước ngắn sau:
+
+1. **Routing có đúng không?**
+   - Xem `supervisor_route` và `route_reason` trong trace.
+   - Nếu route lệch intent thì ưu tiên sửa rule routing trước.
+
+2. **Worker có chạy đúng không?**
+   - Test worker độc lập với cùng input.
+   - Xem `worker_io_log` để kiểm tra input/output có đúng contract không.
+
+3. **MCP có được gọi không?**
+   - Xem `mcp_tools_used` và `mcp_result` trong trace.
+   - Nếu cần, thử gọi tool trực tiếp để đối chiếu.
+
+4. **Synthesis có ổn không?**
+   - Xem `retrieved_sources` có đúng tài liệu không.
+   - Kiểm tra prompt có yêu cầu bám context rõ ràng chưa.
+   - Nếu confidence thấp thì cân nhắc chuyển sang HITL.
+
+**Ghi chú ngắn:** phần lớn lỗi thường nằm ở routing hoặc nguồn đầu vào, còn synthesis chỉ là bước tổng hợp cuối cùng.
+
+---
+
 *File này lưu tại: `reports/group_report.md`*
