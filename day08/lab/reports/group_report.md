@@ -1,145 +1,39 @@
-# Báo Cáo Nhóm — Lab Day 08: Full RAG Pipeline
+# Group Report — Day 08 RAG Pipeline
 
-**Tên nhóm:** ___________  
-**Thành viên:**
-| Tên | Vai trò | Email |
-|-----|---------|-------|
-| ___ | Tech Lead | ___ |
-| ___ | Retrieval Owner | ___ |
-| ___ | Eval Owner | ___ |
-| ___ | Documentation Owner | ___ |
+## Tóm tắt
+Nhóm đã xây dựng thành công pipeline RAG nội bộ dành cho khối CS + IT Helpdesk nhằm trả lời các câu hỏi về chính sách và quy trình kỹ thuật. Hệ thống trải qua 4 giai đoạn phát triển:
+1. **Indexing:** Sử dụng ChromaDB làm vector store với mô hình embedding local `Alibaba-NLP/gte-multilingual-base`.
+2. **Retrieval:** Triển khai Dense Retrieval cơ bản và nâng cấp bằng kỹ thuật Rerank.
+3. **Generation:** Sử dụng LLM Groq (`llama-3.1-8b-instant`) làm mặc định để đảm bảo tốc độ phản hồi nhanh.
+4. **Evaluation:** Thiết lập hệ thống LLM-as-Judge tự động chấm điểm dựa trên 4 metrics cốt lõi.
 
-**Ngày nộp:** ___________  
-**Repo:** ___________  
-**Độ dài khuyến nghị:** 600–900 từ
+## Danh sách thành viên và Phân vai (Nhóm 5 người)
+| Thành viên | Vai trò chính | Trách nhiệm chính |
+| :--- | :--- | :--- |
+| **Phạm Đan Kha** | Tech Lead | Tích hợp hệ thống, quản lý API Groq và xây dựng cơ chế Fallback xử lý lỗi. |
+| **Trần Đặng Quang Huy** | Indexing Owner | Preprocess tài liệu, xây dựng chiến lược chunking và quản lý metadata trong ChromaDB. |
+| **Vũ Đức Kiên** | Retrieval Owner | Implement `retrieve_dense`, chuẩn hóa dữ liệu đầu ra và thiết lập logic abstain chống bịa thông tin. |
+| **Phan Anh Khôi** | Eval Owner | Xây dựng bộ chấm điểm LLM-as-Judge và trực tiếp triển khai mô hình Rerank cho Sprint 3. |
+| **Nguyễn Duy Hiếu** | Documentation Owner | Phân tích Root Cause từ log đánh giá, hoàn thiện tài liệu kiến trúc và nhật ký tuning. |
 
----
+## Kết quả chính
+* **Sprint 1:** Hoàn thành tiền xử lý 5 tài liệu, chia nhỏ thành 30 chunks với kích thước 400 tokens và overlap 80 tokens, đảm bảo giữ đủ metadata `source`, `section`, và `effective_date`.
+* **Sprint 2:** Xây dựng thành công Baseline RAG có khả năng trích dẫn nguồn `[1]` và từ chối trả lời (abstain) chính xác cho các câu hỏi ngoài phạm vi như mã lỗi `ERR-403-AUTH`.
+* **Sprint 3:** Triển khai biến thể Rerank sử dụng Cross-encoder (`ms-marco-MiniLM-L-6-v2`) để tối ưu hóa việc chọn lọc Top-3 context.
+* **Sprint 4:** Chạy scorecard tự động cho 10 câu hỏi test. Kết quả cho thấy biến thể Rerank vượt trội so với Baseline về độ đầy đủ thông tin.
 
-> **Hướng dẫn nộp group report:**
->
-> - File này nộp tại: `reports/group_report.md`
-> - Deadline: Được phép commit **sau 18:00** (xem SCORING.md)
-> - Tập trung vào **quyết định kỹ thuật cấp nhóm** — không trùng lặp với individual reports
-> - Phải có **bằng chứng từ code, scorecard, hoặc tuning log** — không mô tả chung chung
+## Quan sát từ evaluation
+* **Sự cải thiện vượt trội:** Điểm **Completeness (Độ đầy đủ)** tăng mạnh từ **3.30 lên 4.40 (+1.10)** khi bật Rerank.
+* **Khắc phục lỗi Retrieval:** Ở câu hỏi q02 về thời hạn hoàn tiền, Baseline bị lỗi (điểm 1/5) do bốc nhầm chunk quy trình; Rerank đã sửa thành công (điểm 5/5) bằng cách đẩy đúng chunk chứa thông tin "7 ngày" lên vị trí ưu tiên.
+* **Tính an toàn cao:** Cả Baseline và Variant đều đạt điểm **Faithfulness (Độ trung thực) tuyệt đối** ở các câu hỏi bẫy, chứng minh prompt grounding hoạt động rất hiệu quả.
+* **Đánh đổi Latency:** Việc sử dụng Rerank và LLM-as-Judge làm tăng độ trễ (latency) của hệ thống nhưng mang lại chất lượng câu trả lời ổn định và giàu chứng cứ hơn.
 
----
+## Deliverables đã hoàn thành
+* Mã nguồn: `index.py`, `rag_answer.py`, `eval.py`
+* Dữ liệu & Log: `data/test_questions.json`, `logs/grading_run.json`
+* Kết quả đánh giá: `results/scorecard_baseline.md`, `results/scorecard_variant.md`
+* Tài liệu: `docs/architecture.md`, `docs/tuning-log.md`
+* Báo cáo: `reports/group_report.md` và 5 file báo cáo cá nhân
 
-## 1. Pipeline nhóm đã xây dựng (150–200 từ)
-
-> Mô tả ngắn gọn pipeline của nhóm:
-> - Chunking strategy: size, overlap, phương pháp tách (by paragraph, by section, v.v.)
-> - Embedding model đã dùng
-> - Retrieval mode: dense / hybrid / rerank (Sprint 3 variant)
-
-**Chunking decision:**
-> VD: "Nhóm dùng chunk_size=500, overlap=50, tách theo section headers vì tài liệu có cấu trúc rõ ràng."
-
-_________________
-
-**Embedding model:**
-
-_________________
-
-**Retrieval variant (Sprint 3):**
-> Nêu rõ variant đã chọn (hybrid / rerank / query transform) và lý do ngắn gọn.
-
-_________________
-
----
-
-## 2. Quyết định kỹ thuật quan trọng nhất (200–250 từ)
-
-> Chọn **1 quyết định thiết kế** mà nhóm thảo luận và đánh đổi nhiều nhất trong lab.
-> Phải có: (a) vấn đề gặp phải, (b) các phương án cân nhắc, (c) lý do chọn.
-
-**Quyết định:** ___________________
-
-**Bối cảnh vấn đề:**
-
-_________________
-
-**Các phương án đã cân nhắc:**
-
-| Phương án | Ưu điểm | Nhược điểm |
-|-----------|---------|-----------|
-| ___ | ___ | ___ |
-| ___ | ___ | ___ |
-
-**Phương án đã chọn và lý do:**
-
-_________________
-
-**Bằng chứng từ scorecard/tuning-log:**
-
-_________________
-
----
-
-## 3. Kết quả grading questions (100–150 từ)
-
-> Sau khi chạy pipeline với grading_questions.json (public lúc 17:00):
-> - Câu nào pipeline xử lý tốt nhất? Tại sao?
-> - Câu nào pipeline fail? Root cause ở đâu (indexing / retrieval / generation)?
-> - Câu gq07 (abstain) — pipeline xử lý thế nào?
-
-**Ước tính điểm raw:** ___ / 98
-
-**Câu tốt nhất:** ID: ___ — Lý do: ___________________
-
-**Câu fail:** ID: ___ — Root cause: ___________________
-
-**Câu gq07 (abstain):** ___________________
-
----
-
-## 4. A/B Comparison — Baseline vs Variant (150–200 từ)
-
-> Dựa vào `docs/tuning-log.md`. Tóm tắt kết quả A/B thực tế của nhóm.
-
-**Biến đã thay đổi (chỉ 1 biến):** ___________________
-
-| Metric | Baseline | Variant | Delta |
-|--------|---------|---------|-------|
-| ___ | ___ | ___ | ___ |
-| ___ | ___ | ___ | ___ |
-
-**Kết luận:**
-> Variant tốt hơn hay kém hơn? Ở điểm nào?
-
-_________________
-
----
-
-## 5. Phân công và đánh giá nhóm (100–150 từ)
-
-> Đánh giá trung thực về quá trình làm việc nhóm.
-
-**Phân công thực tế:**
-
-| Thành viên | Phần đã làm | Sprint |
-|------------|-------------|--------|
-| ___ | ___________________ | ___ |
-| ___ | ___________________ | ___ |
-| ___ | ___________________ | ___ |
-| ___ | ___________________ | ___ |
-
-**Điều nhóm làm tốt:**
-
-_________________
-
-**Điều nhóm làm chưa tốt:**
-
-_________________
-
----
-
-## 6. Nếu có thêm 1 ngày, nhóm sẽ làm gì? (50–100 từ)
-
-> 1–2 cải tiến cụ thể với lý do có bằng chứng từ scorecard.
-
-_________________
-
----
-
-*File này lưu tại: `reports/group_report.md`*  
-*Commit sau 18:00 được phép theo SCORING.md*
+## Kết luận
+Pipeline RAG của nhóm đã vận hành ổn định và đáp ứng đầy đủ yêu cầu từ Sprint 1 đến Sprint 4. Thông qua thực nghiệm, nhóm xác định **Rerank** là biến thể mang lại giá trị lớn nhất trong việc nâng cao chất lượng câu trả lời cho các câu hỏi chính sách phức tạp. Hệ thống sẵn sàng cho việc triển khai Grading chính thức.
