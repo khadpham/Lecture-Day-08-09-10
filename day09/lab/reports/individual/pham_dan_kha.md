@@ -1,6 +1,6 @@
 # Báo Cáo Cá Nhân — Lab Day 09: Multi-Agent Orchestration
 
-**Họ và tên:** member_4  
+**Họ và tên:** Phạm Đan Kha
 **Vai trò trong nhóm:** UI/UX + Demo + Setup Owner  
 **Ngày nộp:** 2026-04-14
 

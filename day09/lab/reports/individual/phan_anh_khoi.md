@@ -1,6 +1,6 @@
 # Báo Cáo Cá Nhân — Lab Day 09: Multi-Agent Orchestration
 
-**Họ và tên:** member_3  
+**Họ và tên:** Phan Anh Khôi
 **Vai trò trong nhóm:** Synthesis/Confidence Owner  
 **Ngày nộp:** 2026-04-14
 

@@ -1,12 +1,12 @@
 # Báo Cáo Nhóm — Lab Day 09: Multi-Agent Orchestration
 
-**Tên nhóm:** E403 - nhóm 72  
-**Thành viên:** 
-* 2A202600292 - Trần Đặng Quang Huy - huytdqhe180383
-* 2A202600253 - Phạm Đan Kha - khadpham
-* 2A202600153- Nguyễn Duy Hiếu- SharkUndead
-* 2A202600276 - Phan Anh Khôi - anhkhoiphan03
-* 2A202600338 - Vũ Đức Kiên - helloisKien
+**Tên nhóm:** Team 72-Room 403
+**Thành viên:**
+2A202600292 - Trần Đặng Quang Huy - huytdqhe180383
+2A202600253 - Phạm Đan Kha - khadpham
+2A202600153- Nguyễn Duy Hiếu- SharkUndead
+2A202600276 - Phan Anh Khôi - anhkhoiphan03
+2A202600338 - Vũ Đức Kiên - helloisKien  
 **Ngày nộp:** 2026-04-14  
 **Repo:** `Lecture-Day-08-09-10/day09/lab`
 
@@ -133,11 +133,21 @@ Nguồn số liệu so sánh:
 - Báo cáo có dẫn chứng trace theo từng case.
 
 **Điều nhóm làm chưa tốt:**
-- Numeric fidelity chưa cao ở nhóm câu có nhiều mốc số.
+- Routing còn lỗi ở query multi-hop: khi câu hỏi chứa đồng thời policy keywords (`cấp quyền/level`) và retrieval keywords (`P1/SLA/ticket`), hệ thống vẫn ưu tiên `retrieval_worker`, làm `policy_tool_worker` không chạy.
+- Cờ `needs_tool` được supervisor set nhưng chưa được `route_decision()` sử dụng, dẫn đến mismatch giữa ý định điều phối và route thực tế.
+- Logic `human_review` phụ thuộc nhiều vào pattern mã lỗi mơ hồ (`ERR-*`), nên các case rủi ro cao nhưng không match regex có thể không được chuyển review đúng lúc.
+- HITL mới ở mức placeholder: chỉ set `hitl_triggered=True` và ghi log, chưa có cơ chế “pause-and-wait” để nhận input từ người vận hành.
+- Chưa hỗ trợ streaming response (`stream=False` ở các LLM call), làm UX kém mượt khi câu trả lời dài.
+- Mỗi lần chạy là state mới hoàn toàn, chưa có session memory nên chưa hỗ trợ hội thoại nhiều lượt có ngữ cảnh.
 
 **Nếu làm lại:**
-- Chốt tiêu chí route scorer sớm cho case pha trộn SLA + access.
-- Chạy thêm vòng tuning trước khi đóng report.
+- Thiết kế routing theo cơ chế hybrid/scoring ngay từ đầu: nếu có access-control rõ ràng thì ưu tiên policy-path hoặc route song song có hợp nhất kết quả, tránh rule cứng “retrieval-first”.
+- Đưa `needs_tool` thành tín hiệu bắt buộc trong `route_decision()` (có test coverage riêng cho conflict giữa `supervisor_route` và `needs_tool`).
+- Mở rộng điều kiện `human_review`: dùng risk scoring theo ngữ nghĩa + từ khóa khẩn cấp thay vì chỉ dựa mạnh vào regex mã lỗi.
+- Triển khai HITL thực sự (interrupt/resume), có trạng thái chờ duyệt và audit trail cho quyết định của human.
+- Bật streaming cho synthesis để cải thiện trải nghiệm người dùng và giảm cảm giác timeout.
+- Thêm session/state store cho hội thoại nhiều lượt (thread/session id + memory window) để giữ ngữ cảnh giữa các câu hỏi.
+- Chuẩn hóa bộ test regression cho các case dễ vỡ: multi-hop routing, policy+retrieval conflict, high-risk escalation, và tool-invocation contract.
 
 ---
 

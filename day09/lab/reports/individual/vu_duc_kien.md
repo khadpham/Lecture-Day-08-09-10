@@ -1,6 +1,6 @@
 # Báo Cáo Cá Nhân — Lab Day 09: Multi-Agent Orchestration
 
-**Họ và tên:** member_2  
+**Họ và tên:** Vũ Đức Kiên  
 **Vai trò trong nhóm:** Policy/MCP Owner  
 **Ngày nộp:** 2026-04-14
 
