@@ -45,6 +45,15 @@ _________________
 |-----------------------------------|------------------|-----------------------------|-------------------------------|
 | … | … | … | … |
 
+## Metric Impact Evidence (Sprint 2 & 3 Validation)
+| Rule / Expectation mới (tên ngắn) | Trước (số liệu) | Sau / khi inject (số liệu) | Chứng cứ (log / CSV / commit) |
+| :--- | :--- | :--- | :--- |
+| **Rule: Quarantine Empty** | Raw có 1 dòng rỗng (`chunk_text`="") | `quarantine_records` tăng thêm 1 | Log clean run: `quarantine_records=3` |
+| **Rule: Quarantine 2025 HR** | Raw có 1 bản policy năm 2025 | `quarantine_records` tăng thêm 1 | Log clean run: `quarantine_records=3` |
+| **Rule: Exact Deduplication** | Raw có 2 dòng nội dung giống hệt | `quarantine_records` tăng thêm 1 | Log clean run: `quarantine_records=3` |
+| **Expectation: No 14-day refund (HALT)** | Clean pipeline: 0 lỗi, OK (HALT) | Inject bad (bỏ fix): 1 lỗi, FAIL (HALT) | Log `inject-bad`: `Failed: Found 1 chunks still containing stale 14-day policy.` |
+| **Expectation: No legacy docs (WARN)** | Không có cảnh báo ở source system | Bắt được 1 lỗi, báo FAIL (WARN) | Log clean & bad: `Warning: Ingested 1 legacy documents.` |
+
 **Rule chính (baseline + mở rộng):**
 
 - …

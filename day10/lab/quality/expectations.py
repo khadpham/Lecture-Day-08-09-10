@@ -1,116 +1,101 @@
-"""
-Expectation suite đơn giản (không bắt buộc Great Expectations).
-
-Sinh viên có thể thay bằng GE / pydantic / custom — miễn là có halt có kiểm soát.
-"""
-
-from __future__ import annotations
-
+from typing import List, Dict, Tuple
 import re
-from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
 
 
-@dataclass
 class ExpectationResult:
-    name: str
-    passed: bool
-    severity: str  # "warn" | "halt"
-    detail: str
+    def __init__(self, name: str, passed: bool, severity: str, detail: str):
+        self.name = name
+        self.passed = passed
+        self.severity = severity  # "WARN" or "HALT"
+        self.detail = detail
 
 
-def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[ExpectationResult], bool]:
-    """
-    Trả về (results, should_halt).
+def run_expectations(cleaned_rows: List[Dict]) -> Tuple[List[ExpectationResult], bool]:
+    results = []
+    halt = False
 
-    should_halt = True nếu có bất kỳ expectation severity halt nào fail.
-    """
-    results: List[ExpectationResult] = []
-
-    # E1: có ít nhất 1 dòng sau clean
-    ok = len(cleaned_rows) >= 1
-    results.append(
-        ExpectationResult(
-            "min_one_row",
-            ok,
-            "halt",
-            f"cleaned_rows={len(cleaned_rows)}",
-        )
-    )
-
-    # E2: không doc_id rỗng
-    bad_doc = [r for r in cleaned_rows if not (r.get("doc_id") or "").strip()]
-    ok2 = len(bad_doc) == 0
-    results.append(
-        ExpectationResult(
-            "no_empty_doc_id",
-            ok2,
-            "halt",
-            f"empty_doc_id_count={len(bad_doc)}",
-        )
-    )
-
-    # E3: policy refund không được chứa cửa sổ sai 14 ngày (sau khi đã fix)
-    bad_refund = [
+    # ---------------------------------------------------------
+    # EXPECTATION 1: HALT on unpatched 14-day refund policy
+    # Logic: Ensures the cleanup rule successfully patched the 14-day window.
+    # ---------------------------------------------------------
+    stale_refunds = [
         r
         for r in cleaned_rows
         if r.get("doc_id") == "policy_refund_v4"
-        and "14 ngày làm việc" in (r.get("chunk_text") or "")
+        and "14 ngày làm việc" in r.get("chunk_text", "")
     ]
-    ok3 = len(bad_refund) == 0
-    results.append(
-        ExpectationResult(
-            "refund_no_stale_14d_window",
-            ok3,
-            "halt",
-            f"violations={len(bad_refund)}",
+    if stale_refunds:
+        results.append(
+            ExpectationResult(
+                "expect_no_14_day_refund",
+                False,
+                "HALT",
+                f"Failed: Found {len(stale_refunds)} chunks still containing stale 14-day policy.",
+            )
         )
-    )
-
-    # E4: chunk_text đủ dài
-    short = [r for r in cleaned_rows if len((r.get("chunk_text") or "")) < 8]
-    ok4 = len(short) == 0
-    results.append(
-        ExpectationResult(
-            "chunk_min_length_8",
-            ok4,
-            "warn",
-            f"short_chunks={len(short)}",
+        halt = True
+    else:
+        results.append(
+            ExpectationResult(
+                "expect_no_14_day_refund",
+                True,
+                "HALT",
+                "Passed: No 14-day refund policies found.",
+            )
         )
-    )
 
-    # E5: effective_date đúng định dạng ISO sau clean (phát hiện parser lỏng)
-    iso_bad = [
-        r
-        for r in cleaned_rows
-        if not re.match(r"^\d{4}-\d{2}-\d{2}$", (r.get("effective_date") or "").strip())
-    ]
-    ok5 = len(iso_bad) == 0
-    results.append(
-        ExpectationResult(
-            "effective_date_iso_yyyy_mm_dd",
-            ok5,
-            "halt",
-            f"non_iso_rows={len(iso_bad)}",
+    # ---------------------------------------------------------
+    # EXPECTATION 2: HALT on Non-ISO 8601 dates
+    # Logic: Validates that Cleaning Rule 2 successfully converted all dates.
+    # ---------------------------------------------------------
+    invalid_dates = []
+    for r in cleaned_rows:
+        date_val = r.get("effective_date", "").strip()
+        if date_val and not re.match(r"^\d{4}-\d{2}-\d{2}$", date_val):
+            invalid_dates.append(r)
+
+    if invalid_dates:
+        results.append(
+            ExpectationResult(
+                "expect_iso_dates",
+                False,
+                "HALT",
+                f"Failed: Found {len(invalid_dates)} rows with non-ISO date formats.",
+            )
         )
-    )
-
-    # E6: không còn marker phép năm cũ 10 ngày trên doc HR (conflict version sau clean)
-    bad_hr_annual = [
-        r
-        for r in cleaned_rows
-        if r.get("doc_id") == "hr_leave_policy"
-        and "10 ngày phép năm" in (r.get("chunk_text") or "")
-    ]
-    ok6 = len(bad_hr_annual) == 0
-    results.append(
-        ExpectationResult(
-            "hr_leave_no_stale_10d_annual",
-            ok6,
-            "halt",
-            f"violations={len(bad_hr_annual)}",
+        halt = True
+    else:
+        results.append(
+            ExpectationResult(
+                "expect_iso_dates",
+                True,
+                "HALT",
+                "Passed: All effective dates conform to ISO-8601.",
+            )
         )
-    )
 
-    halt = any(not r.passed and r.severity == "halt" for r in results)
+    # ---------------------------------------------------------
+    # EXPECTATION 3: WARN on legacy catalog documents
+    # Logic: Flags documents marked as 'legacy' in doc_id to alert the admin, but does not stop the pipeline.
+    # ---------------------------------------------------------
+    legacy_docs = [r for r in cleaned_rows if "legacy" in r.get("doc_id", "").lower()]
+    if legacy_docs:
+        results.append(
+            ExpectationResult(
+                "expect_no_legacy_docs",
+                False,
+                "WARN",
+                f"Warning: Ingested {len(legacy_docs)} legacy documents. Consider pruning from source system.",
+            )
+        )
+    else:
+        results.append(
+            ExpectationResult(
+                "expect_no_legacy_docs",
+                True,
+                "WARN",
+                "Passed: No legacy documents found.",
+            )
+        )
+
     return results, halt

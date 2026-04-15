@@ -24,10 +24,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
+import logging
+
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 from monitoring.freshness_check import check_manifest_freshness
 from quality.expectations import run_expectations
-from transform.cleaning_rules import clean_rows, load_raw_csv, write_cleaned_csv, write_quarantine_csv
+from transform.cleaning_rules import (
+    clean_rows,
+    load_raw_csv,
+    write_cleaned_csv,
+    write_quarantine_csv,
+)
 
 load_dotenv()
 
@@ -88,7 +96,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         log("PIPELINE_HALT: expectation suite failed (halt).")
         return 2
     if halt and args.skip_validate:
-        log("WARN: expectation failed but --skip-validate → tiếp tục embed (chỉ dùng cho demo Sprint 3).")
+        log(
+            "WARN: expectation failed but --skip-validate → tiếp tục embed (chỉ dùng cho demo Sprint 3)."
+        )
 
     # Embed
     embed_ok = cmd_embed_internal(
@@ -118,10 +128,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         "chroma_collection": os.environ.get("CHROMA_COLLECTION", "day10_kb"),
     }
     man_path = MAN_DIR / f"manifest_{run_id.replace(':', '-')}.json"
-    man_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    man_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     log(f"manifest_written={man_path.relative_to(ROOT)}")
 
-    status, fdetail = check_manifest_freshness(man_path, sla_hours=float(os.environ.get("FRESHNESS_SLA_HOURS", "24")))
+    status, fdetail = check_manifest_freshness(
+        man_path, sla_hours=float(os.environ.get("FRESHNESS_SLA_HOURS", "24"))
+    )
     log(f"freshness_check={status} {json.dumps(fdetail, ensure_ascii=False)}")
 
     log("PIPELINE_OK")
@@ -148,7 +162,9 @@ def cmd_embed_internal(cleaned_csv: Path, *, run_id: str, log) -> bool:
         return True
 
     client = chromadb.PersistentClient(path=db_path)
-    emb = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=model_name)
+    emb = embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name=model_name
+    )
     col = client.get_or_create_collection(name=collection_name, embedding_function=emb)
 
     ids = [r["chunk_id"] for r in rows]
@@ -193,7 +209,9 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_run = sub.add_parser("run", help="ingest → clean → validate → embed")
-    p_run.add_argument("--raw", default=str(RAW_DEFAULT), help="Đường dẫn CSV raw export")
+    p_run.add_argument(
+        "--raw", default=str(RAW_DEFAULT), help="Đường dẫn CSV raw export"
+    )
     p_run.add_argument("--run-id", default="", help="ID run (mặc định: UTC timestamp)")
     p_run.add_argument(
         "--no-refund-fix",

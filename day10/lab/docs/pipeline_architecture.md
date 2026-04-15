@@ -13,6 +13,20 @@ raw export (CSV/API/…)  →  clean  →  validate (expectations)  →  embed (
 
 > Vẽ thêm: điểm đo **freshness**, chỗ ghi **run_id**, và file **quarantine**.
 
+# Pipeline Architecture & Data Boundaries
+
+## 1. High-Level Architecture
+Our ETL pipeline is designed to be idempotent, observable, and strict regarding data quality before any text reaches the LLM retrieval engine.
+
+```mermaid
+graph TD
+    A[Raw CSV Export] -->|Ingest Boundary| B(etl_pipeline.py)
+    B --> C{Cleaning Rules}
+    C -->|Quarantine| D[Quarantine CSV]
+    C -->|Cleaned| E{Expectations Suite}
+    E -->|HALT| F[Pipeline Abort]
+    E -->|WARN / PASS| G[Cleaned CSV]
+    G -->|Embed Boundary| H[(ChromaDB: day10_kb)]
 ---
 
 ## 2. Ranh giới trách nhiệm
