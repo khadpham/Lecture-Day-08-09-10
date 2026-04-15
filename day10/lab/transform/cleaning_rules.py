@@ -25,6 +25,8 @@ ALLOWED_DOC_IDS = frozenset(
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DMY_SLASH = re.compile(r"^(\d{2})/(\d{2})/(\d{4})$")
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?$")
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 
 
 def _norm_text(s: str) -> str:
@@ -53,6 +55,19 @@ def _normalize_effective_date(raw: str) -> Tuple[str, str]:
     return "", "invalid_effective_date_format"
 
 
+def _normalize_exported_at(raw: str) -> Tuple[str, str]:
+    """
+    Trả về (iso_datetime, error_reason).
+    exported_at rỗng hoặc sai định dạng sẽ trả lỗi để quarantine.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "", "missing_exported_at"
+    if _ISO_DATETIME.match(s):
+        return s, ""
+    return "", "invalid_exported_at_format"
+
+
 def load_raw_csv(path: Path) -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
     with path.open(encoding="utf-8", newline="") as f:
@@ -77,6 +92,9 @@ def clean_rows(
     4) Quarantine: chunk_text rỗng hoặc effective_date rỗng sau chuẩn hoá.
     5) Loại trùng nội dung chunk_text (giữ bản đầu).
     6) Fix stale refund: policy_refund_v4 chứa '14 ngày làm việc' → 7 ngày.
+    7) Quarantine: exported_at thiếu hoặc sai định dạng ISO datetime.
+    8) Quarantine: chunk_text chứa ký tự control/binary (copy lỗi từ source).
+    9) Quarantine: chunk_text quá dài bất thường (>500 ký tự) để chặn blob rác.
     """
     quarantine: List[Dict[str, Any]] = []
     seen_text: set[str] = set()
@@ -87,7 +105,7 @@ def clean_rows(
         doc_id = raw.get("doc_id", "")
         text = raw.get("chunk_text", "")
         eff_raw = raw.get("effective_date", "")
-        exported_at = raw.get("exported_at", "")
+        exported_at_raw = raw.get("exported_at", "")
 
         if doc_id not in ALLOWED_DOC_IDS:
             quarantine.append({**raw, "reason": "unknown_doc_id"})
@@ -115,6 +133,19 @@ def clean_rows(
             quarantine.append({**raw, "reason": "missing_chunk_text"})
             continue
 
+        exported_at_norm, exported_at_err = _normalize_exported_at(exported_at_raw)
+        if exported_at_err:
+            quarantine.append({**raw, "reason": exported_at_err, "exported_at_raw": exported_at_raw})
+            continue
+
+        if _CONTROL_CHARS.search(text):
+            quarantine.append({**raw, "reason": "chunk_text_contains_control_chars"})
+            continue
+
+        if len(text) > 500:
+            quarantine.append({**raw, "reason": "chunk_text_too_long"})
+            continue
+
         key = _norm_text(text)
         if key in seen_text:
             quarantine.append({**raw, "reason": "duplicate_chunk_text"})
@@ -137,7 +168,7 @@ def clean_rows(
                 "doc_id": doc_id,
                 "chunk_text": fixed_text,
                 "effective_date": eff_norm,
-                "exported_at": exported_at or "",
+                "exported_at": exported_at_norm,
             }
         )
 

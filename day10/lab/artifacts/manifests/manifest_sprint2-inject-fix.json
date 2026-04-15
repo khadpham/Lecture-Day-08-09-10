@@ -1,0 +1,14 @@
+{
+  "run_id": "sprint2-inject-fix",
+  "run_timestamp": "2026-04-15T10:31:02.494284+00:00",
+  "raw_path": "data\\raw\\policy_export_inject.csv",
+  "raw_records": 13,
+  "cleaned_records": 8,
+  "quarantine_records": 5,
+  "latest_exported_at": "2026-04-10T10:00:00",
+  "no_refund_fix": false,
+  "skipped_validate": false,
+  "cleaned_csv": "artifacts\\cleaned\\cleaned_sprint2-inject-fix.csv",
+  "chroma_path": "./chroma_db",
+  "chroma_collection": "day10_kb"
+}

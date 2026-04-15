@@ -112,5 +112,45 @@ def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[Expectati
         )
     )
 
+    # E7: exported_at phải đúng ISO datetime trong cleaned (phát hiện nguồn export lỗi)
+    iso_dt = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?$")
+    bad_exported_at = [
+        r
+        for r in cleaned_rows
+        if not iso_dt.match((r.get("exported_at") or "").strip())
+    ]
+    ok7 = len(bad_exported_at) == 0
+    results.append(
+        ExpectationResult(
+            "exported_at_iso_datetime",
+            ok7,
+            "halt",
+            f"invalid_exported_at_rows={len(bad_exported_at)}",
+        )
+    )
+
+    # E8: sau clean không được trùng nội dung theo (doc_id, effective_date, normalized_text)
+    seen_keys = set()
+    dup_count = 0
+    for r in cleaned_rows:
+        key = (
+            (r.get("doc_id") or "").strip(),
+            (r.get("effective_date") or "").strip(),
+            " ".join((r.get("chunk_text") or "").strip().split()).lower(),
+        )
+        if key in seen_keys:
+            dup_count += 1
+        else:
+            seen_keys.add(key)
+    ok8 = dup_count == 0
+    results.append(
+        ExpectationResult(
+            "no_duplicate_doc_effective_text",
+            ok8,
+            "halt",
+            f"duplicate_rows={dup_count}",
+        )
+    )
+
     halt = any(not r.passed and r.severity == "halt" for r in results)
     return results, halt
