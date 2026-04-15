@@ -41,9 +41,10 @@ Bằng chứng cho hệ thống log Ingestion của tôi nằm ở đầu ra ter
 run_id=2026-04-15T08-53Z
 raw_records=10
 manifest_written=artifacts\manifests\manifest_2026-04-15T08-53Z.json
-Số liệu này chứng minh luồng đọc file thô đã hoạt động hoàn hảo và bàn giao đúng 10 bản ghi cho ranh giới Transform.
+Số liệu này chứng minh luồng đọc file thô đã hoạt động hoàn hảo và bàn giao đúng 10 bản ghi cho ranh giới Transform. 
+```
 
-5. Cải tiến tiếp theo
+## 5. Cải tiến tiếp theo
 Nếu có thêm 2 giờ, tôi sẽ viết một hàm kết nối API hoặc đọc trực tiếp từ bảng cơ sở dữ liệu PostgreSQL thay vì đọc từ file CSV tĩnh RAW_DEFAULT. Điều này sẽ mô phỏng chính xác hơn ranh giới Ingestion trong một hệ thống thực tế.
 
 

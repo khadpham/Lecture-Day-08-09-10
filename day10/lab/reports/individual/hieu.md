@@ -43,8 +43,10 @@ cleaned_records=7
 quarantine_records=3
 cleaned_csv=artifacts\cleaned\cleaned_2026-04-15T08-53Z.csv
 Từ 10 records thô, hệ thống của tôi đã cách ly thành công 1 dòng rỗng, 1 dòng HR 2025 và 1 dòng trùng lặp, đẩy chỉ số quarantine_records từ 0 lên 3 một cách chuẩn xác.
+```
+---
 
-5. Cải tiến tiếp theo
+## 5. Cải tiến tiếp theo
 Nếu có thêm 2 giờ, tôi sẽ nâng cấp hàm Deduplication từ "Exact Match" (so sánh chuỗi/hash tuyệt đối) thành "Semantic Deduplication" (so sánh độ tương đồng nhúng - cosine similarity) để bắt được cả những câu viết khác nhau nhưng có chung ý nghĩa.
 
 
