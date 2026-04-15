@@ -3,7 +3,7 @@
 
 version: "1.0"
 dataset: "kb_chunk_export"
-owner_team: "__TODO__"
+owner_team: "AICB-P1 Group 113"
 
 schema_cleaned:
   chunk_id:
@@ -29,14 +29,23 @@ schema_cleaned:
 quality_rules:
   - id: "no_duplicate_chunk_text"
     severity: "warn"
+  - id: "post_clean_duplicate_chunk_text"
+    description: "Không được trùng chunk_text sau khi áp rule clean/refund-note scrub"
+    severity: "warn"
+  - id: "exported_at_must_be_iso_datetime"
+    description: "Mọi record cleaned phải có exported_at parseable để freshness đo được"
+    severity: "halt"
   - id: "no_stale_refund_window"
     description: "Không được để chunk policy refund chứa cửa sổ 14 ngày (lệch so với v4 = 7 ngày)"
     severity: "halt"
+  - id: "refund_no_stale_migration_marker"
+    description: "Chunk policy refund không còn marker migration policy-v3/sync cũ"
+    severity: "warn"
 
 freshness:
   measured_at: "publish"  # ingest | cleaned | publish
   sla_hours: 24
-  alert_channel: "__TODO__"
+  alert_channel: "slack:#aicb-day10-observability"
 
 canonical_sources:
   - path: "data/docs/policy_refund_v4.txt"

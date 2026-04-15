@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 
@@ -109,6 +110,36 @@ def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[Expectati
             ok6,
             "halt",
             f"violations={len(bad_hr_annual)}",
+        )
+    )
+
+    # E7: chunk_id phải duy nhất để upsert idempotent không ghi đè sai
+    ids = [(r.get("chunk_id") or "").strip() for r in cleaned_rows]
+    dup_count = len(ids) - len(set(ids))
+    ok7 = dup_count == 0
+    results.append(
+        ExpectationResult(
+            "chunk_id_unique",
+            ok7,
+            "halt",
+            f"duplicate_chunk_id_count={dup_count}",
+        )
+    )
+
+    # E8: không còn marker migration stale trong chunk policy refund sau clean
+    stale_marker = [
+        r
+        for r in cleaned_rows
+        if r.get("doc_id") == "policy_refund_v4"
+        and re.search(r"policy-v3|sync cũ|lỗi migration", (r.get("chunk_text") or ""), flags=re.IGNORECASE)
+    ]
+    ok9 = len(stale_marker) == 0
+    results.append(
+        ExpectationResult(
+            "refund_no_stale_migration_marker",
+            ok9,
+            "warn",
+            f"violations={len(stale_marker)}",
         )
     )
 
