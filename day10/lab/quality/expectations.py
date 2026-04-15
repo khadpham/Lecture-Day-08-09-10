@@ -112,5 +112,42 @@ def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[Expectati
         )
     )
 
+    # E7: Không chứa email (PII) trong text đã clean
+    emails_found = [
+        r for r in cleaned_rows 
+        if re.search(r"[\w\.-]+@[\w\.-]+\.\w+", r.get("chunk_text", ""))
+    ]
+    ok7 = len(emails_found) == 0
+    results.append(
+        ExpectationResult(
+            "no_pii_emails_in_text",
+            ok7,
+            "halt",
+            f"violations={len(emails_found)}",
+        )
+    )
+
+    # E8: Trường exported_at của toàn bộ chunk phải hợp lệ chuẩn ISO 8601
+    bad_exports = []
+    for r in cleaned_rows:
+        val = (r.get("exported_at") or "").strip()
+        try:
+            from datetime import datetime
+            datetime.fromisoformat(val)
+        except ValueError:
+            bad_exports.append(r)
+            
+    ok8 = len(bad_exports) == 0
+    results.append(
+        ExpectationResult(
+            "exported_at_is_valid_iso",
+            ok8,
+            "halt",
+            f"invalid_exported_at={len(bad_exports)}"
+        )
+    )
+
     halt = any(not r.passed and r.severity == "halt" for r in results)
     return results, halt
+
+    
