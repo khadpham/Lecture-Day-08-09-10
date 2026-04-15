@@ -9,3 +9,4 @@ chroma_db/
 day08/lab/data/grading_questions.json
 day08/lab/chroma_db/chroma.sqlite3
 
+.venv/
