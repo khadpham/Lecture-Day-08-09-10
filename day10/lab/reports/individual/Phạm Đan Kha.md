@@ -1,26 +1,47 @@
-> # Individual Report — AI in Action (Lab Day 10)
-> **Name:** Phạm Đan Kha  
-> **Role:** Embed Owner  
-> 
-> ### 1. Specific Responsibilities
-> As the Embed Owner for this pipeline, my primary responsibility was managing the interface between the cleaned data artifact and our local ChromaDB vector store. I managed the `cmd_embed_internal` function within `etl_pipeline.py`, ensuring that the ingestion of text chunks into the `day10_kb` collection was seamless, idempotent, and perfectly mirrored the most recent output of the data cleaning team.
-> 
-> ### 2. Key Technical Decision: Idempotent Upserts and Pruning
-> A critical data observability requirement is that rerunning a pipeline should not artificially bloat the downstream database. If we simply used `.add()` methods, multiple runs would duplicate the exact same chunks, destroying our retrieval accuracy. 
-> 
-> I implemented a strict idempotent strategy using two methods. First, I utilised ChromaDB's `.upsert()` function, mapping the unique `chunk_id` from the cleaned CSV directly to the vector store's internal ID. This ensures that if a chunk's text or metadata changes (e.g., a policy date is updated), the vector is overwritten rather than duplicated. Second, I introduced a pruning mechanism: the script calculates the set difference between existing vector IDs and the incoming `chunk_id`s (`prev_ids - set(ids)`). Any stale IDs that no longer exist in the freshly cleaned data are actively deleted (`col.delete()`). This guarantees that our vector index acts as an exact snapshot of the publish boundary.
-> 
-> ### 3. Anomaly Detected and Addressed
-> During the initial execution of the embedding phase, our pipeline generated a startling log from the `sentence-transformers` library: `embeddings.position_ids | UNEXPECTED`. 
-> 
-> Initially, this looked like a critical failure in the model weight loading process. However, after investigating the model architecture, I identified this as a known, benign artifact when loading the `all-MiniLM-L6-v2` model from the Hugging Face Hub using the current version of the library. Because the model architecture strictly ignores these specific position IDs when loaded into this context, I made the informed decision to document this in our runbook as a non-fatal warning rather than halting the pipeline. It is an operational reality of using pre-trained weights, and the actual embedding function proceeded successfully.
-> 
-> ### 4. Before/After Evidence (Log Extraction)
-> The success of the embedding logic is proven by the successful synchronisation in the logs.
-> * **Evidence of successful final state:** `embed_upsert count=7 collection=day10_kb`
-> 
-> The pipeline successfully took the exact 7 records outputted by the cleaning team and synchronised them with Chroma without duplicating the quarantined records.
-> 
-> ### 5. Proposed 2-Hour Improvement
-> If I had two more hours, I would replace the local, file-based ChromaDB instance with a persistent client connected to a dedicated vector database server (like Milvus or Qdrant via Docker). Currently, storing the database in `./chroma_db` is fine for local prototyping, but in a production environment with multiple Data Scientists running concurrent ETL jobs, we would face file-locking conflicts. A centralised server would resolve this and improve our CI/CD integration.
+# Báo Cáo Cá Nhân — Lab Day 10: Data Pipeline & Observability
 
+**Họ và tên:** 2A202600253 - Phạm Đan Kha  
+**Vai trò:** Embed Owner  
+**Ngày nộp:** 15/04/2026  
+
+---
+
+## 1. Tôi phụ trách phần nào?
+
+**File / module:**
+Là người phụ trách Embed cho pipeline này, trách nhiệm chính của tôi là quản lý giao tiếp giữa các artifact dữ liệu đã được làm sạch và vector store ChromaDB cục bộ. Tôi trực tiếp quản lý hàm `cmd_embed_internal` trong `etl_pipeline.py`, đảm bảo rằng việc nạp các chunk văn bản vào collection `day10_kb` diễn ra trơn tru, mang tính idempotent (không thay đổi trạng thái khi chạy nhiều lần) và phản ánh hoàn hảo kết quả mới nhất từ nhóm làm sạch dữ liệu.
+
+**Kết nối với thành viên khác:**
+Tôi nhận đầu ra (`cleaned_csv`) từ ranh giới Transform của Hiếu và ranh giới Expectation của Khôi. Dữ liệu này được tôi chuyển hóa thành Knowledge Base, phục vụ trực tiếp cho quá trình truy xuất của Agent ở hạ nguồn (Day 09).
+
+**Bằng chứng (commit / comment trong code):**
+Đoạn log `embed_upsert count=7 collection=day10_kb` và các đoạn code tính toán `prev_ids - set(ids)` trong file `etl_pipeline.py`.
+
+---
+
+## 2. Một quyết định kỹ thuật
+
+Quyết định kỹ thuật quan trọng nhất của tôi là thiết lập cơ chế **Idempotent Upserts và Cắt tỉa (Pruning)**. Một yêu cầu cốt lõi về data observability là việc chạy lại pipeline không được làm phình to database (vector bloat). Nếu chỉ dùng hàm `.add()`, các lần chạy lại sẽ nhân bản các chunk giống nhau, phá hủy độ chính xác truy xuất. 
+
+Tôi triển khai chiến lược idempotent qua hai bước. Đầu tiên, dùng hàm `.upsert()` của ChromaDB, ánh xạ `chunk_id` duy nhất từ CSV thành ID nội bộ của vector store (để ghi đè khi có thay đổi nội dung/metadata thay vì nhân bản). Thứ hai, tôi đưa vào cơ chế cắt tỉa: script tính toán sự khác biệt giữa các vector ID hiện có và `chunk_id` đầu vào mới (`prev_ids - set(ids)`). Bất kỳ ID cũ nào không còn tồn tại trong dữ liệu sạch sẽ bị chủ động xóa (`col.delete()`). Điều này đảm bảo vector index luôn là một bản snapshot hoàn hảo của ranh giới phát hành (publish boundary).
+
+---
+
+## 3. Một lỗi hoặc anomaly đã xử lý
+
+**Triệu chứng & Phát hiện:** Trong lần chạy đầu tiên của giai đoạn embedding, pipeline sinh ra một log cảnh báo khá đáng sợ từ thư viện `sentence-transformers`: `embeddings.position_ids | UNEXPECTED`. 
+**Cách xử lý:** Ban đầu, triệu chứng này trông giống như một lỗi nghiêm trọng trong quá trình tải trọng số (weights) của mô hình. Tuy nhiên, sau khi điều tra kiến trúc, tôi nhận định đây là một cảnh báo vô hại (benign artifact) khi tải mô hình `all-MiniLM-L6-v2` từ Hugging Face Hub bằng phiên bản thư viện hiện tại. Vì kiến trúc mô hình chủ động bỏ qua các position ID này khi nạp vào context, tôi đã đưa ra quyết định có cơ sở là ghi chú nó vào Runbook như một cảnh báo (WARN) thay vì code thêm luật để dừng pipeline (HALT). Quá trình embedding thực tế vẫn tiến hành thành công.
+
+---
+
+## 4. Bằng chứng trước / sau
+
+Sự thành công của logic embedding và cơ chế Pruning được chứng minh rõ ràng qua dữ liệu đánh giá:
+**Từ file `before_after_eval.csv`:**
+Đối với truy vấn `q_refund_window`, ở lần chạy `inject-bad` (khi chưa xóa fix lỗi và chưa prune), file đánh giá báo `hits_forbidden=yes` do lẫn lộn vector 14 ngày. Nhưng sau khi hệ thống của tôi chạy bản chuẩn (Clean), vector rác đã bị xóa sạch hoàn toàn khỏi ChromaDB, trả về `contains_expected=yes` VÀ `hits_forbidden=no`. Hơn nữa, log hệ thống ghi nhận đúng `embed_upsert count=7`, đồng bộ chính xác với số record của ranh giới Clean.
+
+---
+
+## 5. Cải tiến tiếp theo
+
+Nếu có thêm 2 giờ, tôi sẽ thay thế phiên bản ChromaDB lưu trữ qua file cục bộ bằng một persistent client kết nối với một server vector database chuyên dụng (như Milvus hoặc Qdrant chạy qua Docker). Hiện tại, lưu DB ở `./chroma_db` phục vụ tốt cho prototype, nhưng trong môi trường production có nhiều Data Scientist cùng chạy ETL đồng thời, chúng ta sẽ dễ gặp xung đột khóa tệp (file-locking). Một server tập trung sẽ khắc phục điều này và cải thiện khả năng tích hợp CI/CD.
