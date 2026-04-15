@@ -50,8 +50,8 @@ def run_expectations(cleaned_rows: List[Dict]) -> Tuple[List[ExpectationResult],
     # ---------------------------------------------------------
     invalid_dates = []
     for r in cleaned_rows:
-        date_val = r.get("effective_date", "").strip()
-        if date_val and not re.match(r"^\d{4}-\d{2}-\d{2}$", date_val):
+        date_validation = r.get("effective_date", "").strip()
+        if date_validation and not re.match(r"^\d{4}-\d{2}-\d{2}$", date_validation):
             invalid_dates.append(r)
 
     if invalid_dates:
